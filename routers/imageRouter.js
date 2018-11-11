@@ -10,67 +10,72 @@ ImageRouter.use((req, res, next) => {
 });
 
 // "/api/images" => get all
-ImageRouter.get("/", (req, res) => {
+ImageRouter.get("/", async (req, res) => {
     console.log("Get all image");
-    ImageModel.find({}, "-__v", (err, images) => {
-        if (err) res.status(500).json({ success: 0, error: err })
-        else res.json({ success: 1, images })
-    });
+    try {
+        const images = await ImageModel.find({})
+            .populate("user", "name avatar").populate("comments", "content")
+        res.json({ success: 1, images })
+    } catch (error) {
+        res.status(500).json({ success: 0, error: error })
+    }
 })
 
 // Get image by id
-ImageRouter.get("/:id", (req, res) => {
+ImageRouter.get("/:id", async (req, res) => {
     let imageId = req.params.id;
-    ImageModel.findById(imageId, (err, imageFound) => {
-        if (err) res.status(500).json({ success: 0, message: err })
-        else if (!imageFound._id) res.status(404).json({ success: 0, message: "Not found!" })
-        else res.json({ success: 1, imageFound })
-    });
+    try {
+        const imageFound = await ImageModel.findById(imageId)
+        if (!imageFound) {
+            res.status(404).json({ success: 0, message: "Not found!" })
+        } else {
+            res.json({ success: 1, imageFound })
+        }
+    } catch (error) {
+        res.status(500).json({ success: 0, message: error })
+    }
 });
 
 // Create image
-ImageRouter.post("/", (req, res) => {
+ImageRouter.post("/", async (req, res) => {
     const { user, url, caption, title } = req.body;
-    ImageModel.create({ user, url, caption, title }, (err, imageCreated) => {
-        if (err) res.status(500).json({ success: 0, message: err })
-        else res.status(201).json({ success: 1, imageCreated })
-    });
+    try {
+        const imageCreated = await ImageModel.create({ user, url, caption, title })
+        res.status(201).json({ success: 1, imageCreated })
+    } catch (error) {
+        res.status(500).json({ success: 0, message: error })
+    }
 });
 
 // Edit image
-ImageRouter.put("/:id", (req, res) => {
+ImageRouter.put("/:id", async (req, res) => {
     const imageId = req.params.id;
-    const { caption, title } = req.body;
-
-    ImageModel.findById(imageId, (err, imageFound) => {
-        if (err) res.status(500).json({ success: 0, message: err })
-        else if (!imageFound._id) res.status(404).json({ success: 0, message: "Not found!" })
-        else {
-            for (key in { caption, title }) {
+    const { url, caption, title, comments } = req.body;
+    try {
+        const imageFound = await ImageModel.findById(imageId)
+        if (!imageFound) {
+            res.status(404).json({ success: 0, message: "Not found!" })
+        } else {
+            for (key in { url, caption, title, comments }) {
                 if (imageFound[key] && req.body[key]) imageFound[key] = req.body[key];
             }
-            imageFound.save((err, imageUpdated) => {
-                if (err) res.status(500).json({ success: 0, message: err })
-                else res.json({ success: 1, user: imageUpdated })
-            });
+            let imageUpdated = imageFound.save()
+            res.json({ success: 1, user: imageUpdated })
         }
-    });
+    } catch (error) {
+        res.status(500).json({ success: 0, message: error })
+    }
 });
 
 // Delete image
-ImageRouter.delete("/:id", (req, res) => {
+ImageRouter.delete("/:id", async (req, res) => {
     const imageId = req.params.id;
-
-    ImageModel.findById(imageId, (err, imageFound) => {
-        if (err) res.status(500).json({ success: 0, message: err })
-        else if (!imageFound._id) res.status(404).json({ success: 0, message: "Not found!" })
-        else {
-            imageFound.delete((err, imageDeleted) => {
-                if (err) console.log(err)
-                else res.json({ success: 1, user: imageDeleted })
-            })
-        }
-    });
+    try {
+        await ImageModel.remove({ _id: imageId })
+        res.json({ success: 1 });
+    } catch (error) {
+        res.status(500).json({ success: 0, message: error })
+    }
 });
 
 module.exports = ImageRouter;
